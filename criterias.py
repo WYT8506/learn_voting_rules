@@ -1,7 +1,8 @@
-from data_generator import data_generator
-from voting_rules import voting_rules
+from data import data_generator
+from voting_rule import voting_rules
 from itertools import permutations
-from learn import learn
+from machine_learning import learn
+from fair import fairness
 
 import copy
 import random
@@ -171,7 +172,25 @@ class criteria_satisfaction:
                        consistency_count+=1
 
         print(consistency_count/profile_count)
-
+    def unfairness(candidates,preference_profiles,n,voting_rule,group1,group2,learned_model = None):
+        total_unfairness = 0
+        profile_count = 0
+        for pp in preference_profiles:
+            """
+            print(profile_count)
+            print(str(pp[0]))
+            """
+            if learned_model == None:
+                pp_win = voting_rule(candidates,pp)
+            else:
+                pp_win = voting_rules.learned_rule(candidates,pp,learned_model)
+            total_unfairness+=fairness.get_unfairness(candidates,pp,pp_win,group1,group2,fairness.utility_function)
+            
+            profile_count+=1
+            if(profile_count == n):
+                break
+        print(total_unfairness/n)
+        return total_unfairness/n
     def tie_percentage(candidates,perference_profiles,voting_rule):
         tie_count = 0
         count_total = 0
@@ -185,3 +204,5 @@ class criteria_satisfaction:
 
         print(tie_count/count_total)
         return tie_count/count_total
+
+
