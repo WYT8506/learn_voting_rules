@@ -149,6 +149,12 @@ class voting_rules:
                     return max_ranking[i]
         else:
             return None
+    def voter1_tiebreaking(candidates,preference_profile,winners):
+        ranking = preference_profile[0]
+        for candidate in ranking:
+            if candidate in winners:
+                return candidate
+
     #voting rules
     def voting_rule0(candidates,preference_profile):
         weighted_majority_graph = data_generator.weighted_majority_graph(candidates,preference_profile)
@@ -166,26 +172,46 @@ class voting_rules:
         winners = voting_rules.Borda(candidates,preference_profile)
         #return random.choice(winners)
         #return max(voting_rules.minimax_tiebreaking(candidates,winners,preference_profile))
+        """
         mpsr = voting_rules.MPSR_tiebreaking(candidates,preference_profile,winners)
         
         if mpsr !=None:
             return mpsr
-        
+        """
         return max(winners)
-    def voting_rule2(candidates,preference_profile):
+    def voting_rule2A(candidates,preference_profile):
         winners = voting_rules.Copland(candidates,preference_profile)
+   
         mpsr = voting_rules.MPSR_tiebreaking(candidates,preference_profile,winners)
         
         if mpsr !=None:
             return mpsr
+   
+
+        #return random.choice(winners)
+        #return voting_rules.voter1_tiebreaking(candidates,preference_profile,winners)
         return max(winners)
+    def voting_rule2B(candidates,preference_profile):
+        winners = voting_rules.Copland(candidates,preference_profile)
+        return max(winners)
+    def voting_rule2C(candidates,preference_profile):
+        winners = voting_rules.Copland(candidates,preference_profile)
+        return voting_rules.voter1_tiebreaking(candidates,preference_profile,winners)
+
+    def voting_rule2D(candidates,preference_profile):
+        winners = voting_rules.Copland(candidates,preference_profile)
+   
+   
+
+        return random.choice(winners)
+
     def voting_rule10(candidates,preference_profile,group1 = None,group2 = None,alpha = None):
         if group1 == None:
-            group1 = [0,1,2,3,4]
+            group1 = [0]
         if group2 == None:
-            group2 = [5,6,7,8,9]
+            group2 = [1,2]
         if alpha == None:
-            alpha = 0.0
+            alpha = 0.5
         winners = voting_rules.alpha_efficient_fair_borda(candidates,preference_profile,group1,group2,alpha)
         mpsr = voting_rules.MPSR_tiebreaking(candidates,preference_profile,winners)
         
@@ -255,7 +281,35 @@ class events_likelyhood:
         else: return False
 
 
-    
+class labeling:
+    def get_Xs(candidates,preference_profiles):
+        Xs = []
+        for i in range(len(preference_profiles)):
+            preference_profile = preference_profiles[i]
+            positional_score_matrix = data_generator.positional_score_matrix(
+                candidates,preference_profile)
+            weighted_majority_graph = data_generator.weighted_majority_graph(
+                candidates,preference_profile)
+            histogram = data_generator.histogram(candidates,preference_profile)
+            X = data_generator.get_feature_vector(
+                positional_score_matrix, weighted_majority_graph, histogram,preference_profile,candidates)
+            Xs.append(X)
+        return Xs
+
+    def get_labels(candidates,preference_profiles,voting_rule): 
+        labels = []
+        for pp in preference_profiles:
+             labels.append(voting_rule(candidates,pp))
+        ys = []
+        for label in labels:
+           ys.append(candidates.index(label)) 
+        return ys
+    def winners_to_labels(candidates,winners):
+        labels = []
+        for e in winners:
+            labels.append(candidates.index(e))
+        return labels
+
 class learn_voting_rules:
 
     def __init__(self, candidates, preference_profiles):
@@ -263,7 +317,6 @@ class learn_voting_rules:
         self.preference_profiles = preference_profiles
     def get_preference_profiles(self):
         return self.preference_profiles
-
     def learn_voting_rule(self,voting_rule,one_vs_one = None):
         headers = []
         sample_set = []
@@ -276,7 +329,7 @@ class learn_voting_rules:
                 self.candidates,preference_profile)
             histogram = data_generator.histogram(self.candidates,preference_profile)
             x = data_generator.get_feature_vector(
-                positional_score_matrix, weighted_majority_graph, histogram)
+                positional_score_matrix, weighted_majority_graph, histogram,preference_profile,self.candidates)
             y = voting_rule(
                 self.candidates,preference_profile)
             feature_names = data_generator.get_feature_names(

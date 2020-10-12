@@ -92,22 +92,45 @@ class data_generator:
             permutation[1] = histogram[permutation[0]]
         return return_list
 
-    def get_feature_vector(positional_score_matrix, weighted_majority_graph, histogram=None):
+    def get_feature_vector(positional_score_matrix, weighted_majority_graph, histogram=None, preference_profile = None,candidates = None):
         num_candidates = len(positional_score_matrix)
         vector = []
         """
+        perm = list(permutations(candidates))
+        perm = [''.join(ele) for ele in perm] 
+        for ranking in preference_profile:
+            ranking = ''.join(ranking)
+            vector.append(perm.index(ranking))
+
         for i in range(num_candidates):
             for j in range(num_candidates):
                 vector.append(positional_score_matrix[i][j][1])
-        
+
+  
         for i in range(num_candidates):
             for j in range(num_candidates):
                 vector.append(weighted_majority_graph[i][j][1])
+        #print(preference_profile[0])
+        for c in preference_profile[0]:
+            vector.append(ord(c)-97)
         """
         for permutation in histogram:
             vector.append(permutation[1])
+        """
+        for permutation in histogram:
+            vector.append(permutation[1])
+        """
+        """
         #print(vector)
-        
+        for ranking in preference_profile:
+            for i in range(len(candidates)):
+                for j in range(i+1,len(candidates)):
+                    if ranking.index(candidates[i])>ranking.index(candidates[j]):
+                        vector.append(1)
+                    else:
+                        vector.append(0)
+        """
+        #print(vector)
         return vector
 
     def get_feature_names(positional_score_matrix, weighted_majority_graph):
