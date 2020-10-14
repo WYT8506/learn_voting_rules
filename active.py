@@ -12,21 +12,30 @@ class active_learning:
     def get_group(candidates,preference_profile):
         group = active_learning.generate_by_axiom(candidates,preference_profile,generate_by_axioms.generate_by_neutrality,10)
         return group
-    def choose_pf(candidates,preference_profiles,model_name):
+    def choose_pf(candidates,preference_profiles,model_name, no_group =None):
         clf = xgb.Booster({'nthread': 4})  # init model
         clf.load_model(model_name)  # load data
         max_uncertainty = 0
-        chosen = []
+        min_uncertainty = 100
+        max_chosen = []
+        min_chosen = []
         for pf in preference_profiles:
             #print(pf)
-            pf_group = active_learning.get_group(candidates,pf)
+            if no_group == 1:
+                pf_group = [pf]
+            else:
+                pf_group = active_learning.get_group(candidates,pf)
             #print(labeling.get_Xs(candidates,pf_group))
             uncertainty = active_learning.compute_uncertainty(clf,np.array(labeling.get_Xs(candidates,pf_group)))
             if uncertainty > max_uncertainty:
                 max_uncertainty = uncertainty
-                chosen = pf
+                max_chosen = pf
+            if uncertainty < min_uncertainty:
+                min_uncertainty = uncertainty
+                min_chosen = pf 
         print(max_uncertainty)
-        return chosen
+
+        return max_chosen
     def generate_by_axiom(candidates,pf,axiom_generation_func,n,winner = None):
         if winner == None:
             pfs= axiom_generation_func(candidates,pf,n)
@@ -37,6 +46,7 @@ class active_learning:
     def initialize_model(new_Xs,new_ys,params,model_name):
         data = xgb.DMatrix(new_Xs, label=new_ys)
         clf = xgb.train(params,data)
+        #clf = xgb.train(params,data,xgb_model=model_name)
         clf.save_model(model_name)
     def update_model(new_Xs,new_ys,params,model_name):
         data = xgb.DMatrix(new_Xs, label=new_ys)
@@ -51,10 +61,12 @@ class active_learning:
     def prediction_accuracy(Xs,true_ys,model_name):
         clf = xgb.Booster({'nthread': 4})  # init model
         clf.load_model(model_name)  # load data
+        """
         xgb.plot_tree(clf,num_trees=0)
         xgb.plot_tree(clf,num_trees=1)
         xgb.plot_tree(clf,num_trees=2)
         plt.rcParams['figure.figsize'] = [50, 10]
+        """
         #print(plt.show())
         #plt.ion()
         preds = clf.predict(xgb.DMatrix(Xs))
@@ -62,6 +74,7 @@ class active_learning:
         preds = np.argmax(preds,axis = 1)
         error = np.mean( preds != true_ys )
         print("percentage Error:",error)
+        return 1-error
 
     #get the average entropy for distributions
     def entropy(distributions):
