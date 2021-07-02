@@ -105,7 +105,9 @@ class data_generator:
         for c in preference_profile[0]:
             vector.append(ord(c)-97)
         """
-        
+        for i in range(num_candidates):
+            for j in range(num_candidates):
+                vector.append(positional_score_matrix[i][j])
         for i in range(num_candidates):
             for j in range(num_candidates):
                 vector.append(weighted_majority_graph[i][j])

@@ -24,7 +24,7 @@ class voting_rules:
             elif score == max_score:
                 winner.append(candidate_index)
         return winner
-    def plurality_winner(preference_profiles):
+    def Plurality(candidates, preference_profiles):
         votes = np.array(preference_profiles)
         n, m = votes.shape
         scores = np.zeros(m)
@@ -32,7 +32,7 @@ class voting_rules:
             scores[votes[i][0]] += 1
         winner = np.argwhere(scores == np.max(scores)).flatten().tolist()
     
-        return winner, scores
+        return winner
     
     def STV_winner(candidates, preference_profiles):
         votes_cpy = preference_profiles.copy()
@@ -158,6 +158,16 @@ class voting_rules:
             return mpsr
         
         return max(winners)
+    def voting_rule0A(candidates,preference_profile):
+        winners = voting_rules.Plurality(candidates,preference_profile)
+        #return random.choice(winners)
+        #return max(voting_rules.minimax_tiebreaking(candidates,winners,preference_profile))
+        mpsr = voting_rules.MPSR_tiebreaking(candidates,preference_profile,winners)
+        
+        if mpsr !=None:
+            return mpsr
+        
+        return max(winners)
     def voting_rule1(candidates,preference_profile):
         weighted_majority_graph = data_generator.weighted_majority_graph(candidates,preference_profile)
         winners = voting_rules.Borda(candidates,preference_profile)
@@ -195,6 +205,14 @@ class voting_rules:
 
     def voting_rule3(candidates,preference_profile):
         winners = voting_rules.Minimax(candidates,preference_profile)
+        mpsr = voting_rules.MPSR_tiebreaking(candidates,preference_profile,winners)
+        
+        if mpsr !=None:
+            return mpsr
+   
+
+        #return random.choice(winners)
+        #return voting_rules.voter1_tiebreaking(candidates,preference_profile,winners)
         return max(winners)
     def voting_rule4(candidates,preference_profile):
         winners = voting_rules.Condorcet_Borda(candidates,preference_profile)

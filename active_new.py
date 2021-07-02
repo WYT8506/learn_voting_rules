@@ -3,6 +3,7 @@ import time
 import random
 import numpy as np
 from voting_rule_new import labeling
+from scipy.stats import entropy
 from scipy.special import entr
 import matplotlib.pyplot as plt
 import graphviz
@@ -13,9 +14,9 @@ class active_learning:
         group = active_learning.generate_by_axiom(candidates,preference_profile,generate_by_axioms.generate_by_neutrality,10)
         return group
     def choose_pf(candidates,preference_profiles,model_name, no_group =None):
-        clf = xgb.Booster({'nthread': 4})  # init model
+        clf = xgb.Booster()  # init model
         clf.load_model(model_name)  # load data
-        max_uncertainty = 0
+        max_uncertainty = -1
         min_uncertainty = 100
         max_chosen = []
         min_chosen = []
@@ -27,6 +28,37 @@ class active_learning:
                 pf_group = active_learning.get_group(candidates,pf)
             #print(labeling.get_Xs(candidates,pf_group))
             uncertainty = active_learning.compute_uncertainty(clf,np.array(labeling.get_Xs(candidates,pf_group)))
+            if uncertainty > max_uncertainty:
+                max_uncertainty = uncertainty
+                max_chosen = pf
+            if uncertainty < min_uncertainty:
+                min_uncertainty = uncertainty
+                min_chosen = pf 
+        #print(max_uncertainty)
+        return max_chosen
+
+    def choose_pf_consistency_group(candidates,preference_profiles, total_preference_profiles,total_labels,model_name):
+        clf = xgb.Booster()#{'nthread': 4})  # init model
+        clf.load_model(model_name)  # load data
+        max_uncertainty = -1
+        min_uncertainty = 100
+        max_chosen = []
+        min_chosen = []
+        for pf in preference_profiles:
+            #print(pf)
+            uncertainty = 0
+            distributions = clf.predict(xgb.DMatrix(np.array(labeling.get_Xs(candidates,[pf]))))
+            winner_distribution = distributions[0]
+            uncertainty = uncertainty + active_learning.compute_uncertainty(clf,np.array(labeling.get_Xs(candidates,[pf])))
+            for i in range(len(candidates)):
+                pf_group,pf_without_label = generate_by_axioms.generate_by_consistency_all1(candidates,total_preference_profiles, total_labels,pf,candidates[i])
+                if pf_group == []:
+                    group_uncertainty = 0
+                else:
+                    group_uncertainty = active_learning.compute_uncertainty(clf,np.array(labeling.get_Xs(candidates,pf_group)))
+                #group_uncertainty = group_uncertainty + len(pf_without_label)* active_learning.entropy([([1/len(candidates)]*len(candidates))])
+                uncertainty = uncertainty + group_uncertainty * winner_distribution[i]
+           
             if uncertainty > max_uncertainty:
                 max_uncertainty = uncertainty
                 max_chosen = pf
@@ -59,27 +91,21 @@ class active_learning:
         uncertainty = active_learning.entropy(distributions)
         return uncertainty
     def prediction_accuracy(Xs,true_ys,model_name):
-        clf = xgb.Booster({'nthread': 4})  # init model
+        clf = xgb.Booster()#({'nthread': 4})  # init model
         clf.load_model(model_name)  # load data
-        """
-        xgb.plot_tree(clf,num_trees=0)
-        xgb.plot_tree(clf,num_trees=1)
-        xgb.plot_tree(clf,num_trees=2)
-        plt.rcParams['figure.figsize'] = [50, 10]
-        """
-        #print(plt.show())
-        #plt.ion()
         preds = clf.predict(xgb.DMatrix(Xs))
         preds = np.array(preds)
         preds = np.argmax(preds,axis = 1)
         error = np.mean( preds != true_ys )
-        print("percentage Error:",error)
+        #print("percentage Error:",error)
         return 1-error
 
-    #get the average entropy for distributions
+    #get the sum of entropy for distributions
     def entropy(distributions):
         #print(entr(distributions).sum(axis=1).sum(axis=0)/len(distributions))
-        return entr(distributions).sum()/len(distributions)
+        #print(distributions)
+        #print(entr(distributions).sum())
+        return entr(distributions).sum()
 
 class generate_by_axioms:
     #sample n preference profiles to estimate the expected value of the entropy
@@ -101,7 +127,8 @@ class generate_by_axioms:
         #print(perms)
         pfs = []
         winners = []
-        for perm in perms:
+        for i in range(n):     
+            perm = perms[random.randint(0,len(perms)-1)]
             new_pf = copy.deepcopy(pf)
             for j in range(len(new_pf)):
                 ranking =  new_pf[j]
@@ -115,7 +142,7 @@ class generate_by_axioms:
             if winner!=None:
                 new_winner = perm[winner_index]
                 winners.append(new_winner)
-            pfs.append(new_pf)
+            pfs.append(copy.deepcopy(new_pf))
         if winner == None:
             return pfs
         else:
@@ -139,13 +166,14 @@ class generate_by_axioms:
             if count == n:
                 break
         return new_pfs, new_labels
-
     def generate_by_consistency1(candidates,preference_profiles,labels,preference_profile,label,n):
         count = 0
         size = len(preference_profiles)
         new_pfs = []
         new_labels = []
-        while 1:
+        if size == 0:
+            return new_pfs, new_labels
+        for i in range(1000):
             i1 = random.randint(0,size-1)
             if len(preference_profiles[i1]) == len(preference_profile) and labels[i1] == label:
                 pf1 = preference_profiles[i1]
@@ -156,4 +184,49 @@ class generate_by_axioms:
                 count+=1
             if count == n:
                 break
+
         return new_pfs, new_labels
+        ballots = pwp.pref_profile
+    def generate_by_consistency_all(candidates,preference_profiles, labels,preference_profile,label):
+        new_pfs =[]
+        new_labels = []
+        for i in range(len(labels)):
+            if labels[i] == label:
+                new_labels.append(label)
+                pf1 = preference_profile
+                pf2 = preference_profiles[i]
+                new_pf = pf1 + pf2
+                new_pfs.append(new_pf)
+        return new_pfs, new_labels   
+    def generate_by_consistency_all1(candidates,preference_profiles, labels,preference_profile,label):
+        pfs_with_label =[]
+        pfs_without_label = []
+        for i in range(len(labels)):
+            pf1 = preference_profile
+            pf2 = preference_profiles[i]
+            new_pf = pf1 + pf2
+            if labels[i] == label:
+                pfs_with_label.append(new_pf)
+            else:
+                pfs_without_label.append(new_pf)
+        return pfs_with_label, pfs_without_label
+ 
+    def generate_by_monotonicity(candidates,preference_profile,label,n):
+        
+        w = label
+        new_pfs = []
+        winners = []
+        for k in range(n):
+            ballots = copy.deepcopy(preference_profile)
+            for i,v in enumerate(ballots):
+                w_idx = v.index(w)
+                if(w_idx > 0):
+                    # if winner is not 1st choice in this vote
+                    #   swap winner with someone higher
+                    new_idx = random.randint(0,w_idx)
+                    temp = ballots[i][new_idx]
+                    ballots[i][new_idx] = ballots[i][w_idx]
+                    ballots[i][w_idx] = temp
+            new_pfs.append(copy.deepcopy(ballots))
+            winners.append(w)
+        return new_pfs,winners
